@@ -3,45 +3,41 @@ pragma solidity ^0.4.6;
 contract Remittance {
 
 	address public owner;
-	address public Alice;	
-	address public Carol;
-	address public Bob;
-
+	address public carolsAddress;
 	uint    public amountToBob;
 	uint    public deadline;
 	uint    public fee = 10;
 
-	bytes32 password1;
-	bytes32 password2;
+	bytes32    public unlockCode;
 
 	function Remittance()
 	{
 		owner = msg.sender;
 	}
 
-	function init(bytes32 _password1, bytes32 _password2, uint duration)
+	//hash the password client side on the webpage
+	function init(uint passwordHash, uint duration, address Carol)
 		public
 		payable
 		returns(bool success)
 	{
 		require(msg.value > 10);
+		require(duration < 1000);
 		amountToBob = msg.value - fee;
-		Alice = msg.sender;
-		password1 = _password1;
-		password2 = _password2;
+		unlockCode = keccak256(passwordHash, Carol);
 		deadline = block.number + duration;
-
 		owner.transfer(fee);
 		return true;
 	}
 
-	function checkPasswordsFromCarol(bytes32 givenPassword1, bytes32 givenPassword2)
+	//hash the password client side on the webpage
+	//we only need to use 1 password that was given to Bob + Carol's address
+	function checkPasswordHashAndTranferFunds(uint checkPwsHash)
 		public
 		returns(bool success)
 	{	
-		//checkPasswordsFromCarol
-		require(givenPassword1 == password1 && givenPassword2 == password2);
-		Carol.transfer(amountToBob);
+		require(unlockCode == keccak256(checkPwsHash, msg.sender));
+		msg.sender.transfer(amountToBob);
 		return true;
 	}
 
@@ -52,10 +48,5 @@ contract Remittance {
 		require(msg.sender == owner);
 		suicide(owner);
 		return true;
-	}
-
-	function() payable
-	{
-		owner.transfer(msg.value);
 	}
 }
