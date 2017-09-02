@@ -4,13 +4,12 @@ contract Remittance {
 
 	address public owner;
 	uint    public fee = 10;
-	uint    public id;
 	uint    public ownerBalance;
 
-	mapping (uint => Exchange) public exchanges;
+	mapping (bytes32 => Exchange) public exchanges;
+	mapping (bytes32 => bool)     public passwords;
 
 	struct Exchange {
-		bytes32 unlockCode;
 		uint    balance;
 		address exchanger;
 		uint    deadline;
@@ -27,6 +26,25 @@ contract Remittance {
 		owner = msg.sender;
 	}
 
+	// to get the hash for init
+	function hashFunction(bytes32 pw1, bytes32 pw2, address exchangeAddress)
+		public
+		constant
+		returns(bytes32 hash)
+	{
+		require(!passwordHasBeenUsed(pw1));
+		require(!passwordHasBeenUsed(pw2));
+		return keccak256(pw1, pw2, exchangeAddress);
+	}
+
+	function passwordHasBeenUsed(bytes32 pw)
+		public
+		constant
+		returns(bool hasIndeed)
+	{
+		return passwords[pw];
+	}
+
 	//init with a hash of the two passwords and the address of the exchanger
 	function init(uint duration, address exchangeShop, bytes32 hash)
 		public
@@ -39,31 +57,28 @@ contract Remittance {
 		uint amountToExchange = msg.value - fee;
 		uint deadline = block.number + duration;
 
-		Exchange memory exchange = Exchange(hash, amountToExchange, exchangeShop, deadline, msg.sender);
-		exchanges[id] = exchange;
+		exchanges[hash] = Exchange(amountToExchange, exchangeShop, deadline, msg.sender);
 
-		id++;
 		ownerBalance += fee;
 		LogInit(msg.sender, exchangeShop, duration, amountToExchange);
 		return true;
 	}
 
-	function checkPasswordHashAndTranferFunds(uint exchangeID, bytes32 pw1, bytes32 pw2)
+	function checkPasswordHashAndTranferFunds(bytes32 pw1, bytes32 pw2)
 		public
 		returns(bool success)
 	{	
-		require(exchanges[exchangeID].balance > 0);
 		bytes32 unlockAttempt = keccak256(pw1, pw2, msg.sender);
-		require(exchanges[exchangeID].unlockCode == unlockAttempt);
+		require(exchanges[unlockAttempt].balance > 0);
 
-		uint amount = exchanges[id].balance;
-		exchanges[id].balance = 0;
+		uint amount = exchanges[unlockAttempt].balance;
+		exchanges[unlockAttempt].balance = 0;
 		msg.sender.transfer(amount);
 		LogWithdrawal(msg.sender, amount);
 		return true;
 	}
 
-	function reclaimFunds(uint exchangeID)
+	function reclaimFunds(bytes32 exchangeID)
 		public
 		returns(bool success)
 	{
