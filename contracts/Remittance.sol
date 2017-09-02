@@ -71,6 +71,9 @@ contract Remittance {
 		bytes32 unlockAttempt = keccak256(pw1, pw2, msg.sender);
 		require(exchanges[unlockAttempt].balance > 0);
 
+		passwords[pw1] = true;
+		passwords[pw2] = true;
+
 		uint amount = exchanges[unlockAttempt].balance;
 		exchanges[unlockAttempt].balance = 0;
 		msg.sender.transfer(amount);
